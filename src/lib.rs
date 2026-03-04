@@ -86,10 +86,7 @@ impl PostCode {
             PostCode::Bootloader(info) => vec![
                 format!("Bootloader Code: 0x{:08x}", info.code),
                 format!("  Source:  {}", info.source),
-                format!(
-                    "  Status:  {} (0x{:02x})",
-                    info.name, info.status
-                ),
+                format!("  Status:  {} (0x{:02x})", info.name, info.status),
                 format!("  Detail:  {}", info.description),
             ],
             PostCode::Abl(abl) => vec![
@@ -99,8 +96,7 @@ impl PostCode {
             ],
             PostCode::UnknownAbl(code) => vec![
                 format!("ABL Code: 0x{code:08x}"),
-                "  Unknown ABL test point (no matching entry)"
-                    .to_string(),
+                "  Unknown ABL test point (no matching entry)".to_string(),
             ],
             PostCode::Unknown(code) => {
                 vec![format!("Unknown POST code: 0x{code:08x}")]
@@ -839,6 +835,13 @@ fn look_up_abl(code: u32) -> Option<(&'static str, &'static str)> {
         0xEA00ABF4 => ("TpABL15Code020", "ABL L15 Test Point 020"),
 
         // Memory & Overclock Errors
+        0xEA00BAAB => (
+            "TpApcbMemOverclockRecoveryError",
+            "Memory Overclock recovery Fail",
+        ),
+        0xEA00BAAC => {
+            ("TpAblMemoryOverclockErrorRRWText", "Memory Overclock RRW Text")
+        }
         0xEA00BAAD => ("TpMemEmulationError", "Memory Emulation Fail"),
         0xEA00E2CF => (
             "TpAblErrorMemOverclockErrorRrwTestResults",
@@ -869,6 +872,7 @@ fn look_up_abl(code: u32) -> Option<(&'static str, &'static str)> {
         0xEA00E00A => {
             ("TpProcMemPlatformSpecificConfig", "Platform Specific Config")
         }
+        0xEA00E00B => ("TPProcMemPhyCompensation", "ProcMemPhyCompensation"),
         0xEA00E00C => ("TpProcMemStartDcts", "Start DCTs"),
         0xEA00E00D => {
             ("TpProcMemBeforeDramInit", "Before DRAM Init (Public interface)")
@@ -1037,6 +1041,41 @@ fn look_up_abl(code: u32) -> Option<(&'static str, &'static str)> {
         0xEA00E08D => ("TpProcMemC6StorageAllocation", "Allocate C6 Storage"),
         0xEA00E08E => ("TpProcMemLvDdr4", "Before LV DDR4"),
         0xEA00E08F => ("TpProcMemLvLpddr3", "Before LV LPDDR3"),
+
+        // GNB Early Init
+        0xEA00E090 => ("TP0x90", "TP0x90"),
+        0xEA00E091 => ("TP0x91", "GNB earlier interface"),
+        0xEA00E092 => ("TP0x92", "GNB Early VGA entry"),
+        0xEA00E093 => ("TP0x93", "GNB Early VGA exit"),
+        0xEA00E094 => ("TP0x94", "GNB Initialization entry"),
+        0xEA00E095 => ("TP0x95", "GNB Initialization exit"),
+        0xEA00E096 => ("TP0x96", "GNB internal debug code"),
+        0xEA00E097 => ("TP0x97", "GNB internal debug code"),
+        0xEA00E098 => ("TP0x98", "GNB internal debug code"),
+        0xEA00E099 => ("TP0x99", "GNB internal debug code"),
+        0xEA00E09A => ("TP0x9A", "GNB internal debug code"),
+        0xEA00E09B => ("TP0x9B", "GNB internal debug code"),
+        0xEA00E09C => ("TP0x9C", "GNB internal debug code"),
+        0xEA00E09D => ("TP0x9D", "GNB internal debug code"),
+        0xEA00E09E => ("TP0x9E", "GNB internal debug code"),
+        0xEA00E09F => ("TP0x9F", "GNB internal debug code"),
+        0xEA00E0A0 => ("TP0xA0", "TP0xA0"),
+        0xEA00E0A1 => ("TP0xA1", "GNB internal debug code"),
+        0xEA00E0A2 => ("TP0xA2", "GNB internal debug code"),
+        0xEA00E0A3 => ("TP0xA3", "GNB internal debug code"),
+        0xEA00E0A4 => ("TP0xA4", "GNB internal debug code"),
+        0xEA00E0A5 => ("TP0xA5", "GNB internal debug code"),
+        0xEA00E0A6 => ("TP0xA6", "GNB internal debug code"),
+        0xEA00E0A7 => ("TP0xA7", "GNB internal debug code"),
+        0xEA00E0A8 => ("TP0xA8", "GNB internal debug code"),
+        0xEA00E0A9 => ("TP0xA9", "GNB internal debug code"),
+        0xEA00E0AA => ("TP0xAA", "GNB internal debug code"),
+        0xEA00E0AB => ("TP0xAB", "GNB internal debug code"),
+        0xEA00E0AC => ("TP0xAC", "GNB internal debug code"),
+        0xEA00E0AD => ("TP0xAD", "GNB internal debug code"),
+        0xEA00E0AE => ("TP0xAE", "GNB internal debug code"),
+        0xEA00E0AF => ("TP0xAF", "GNB internal debug code"),
+
         0xEA00E0D1 => {
             ("TpProcMemAmdMemAutoPhase2", "ABL 2 memory initialization")
         }
@@ -1142,7 +1181,7 @@ fn look_up_abl(code: u32) -> Option<(&'static str, &'static str)> {
         0xEA00E352 => ("TpAblMemMORStart", "MOR Start"),
         0xEA00E353 => ("TpAblMemMOREnd", "MOR End"),
         0xEA00E354 => ("TpAblMemMORExecuted", "MOR Executed"),
-        0xEA00EFFF => ("Tps", "EndAgesas"),
+        0xEA00EFFF => ("EndAgesaTps", "EndAgesas"),
 
         // ABL1 Codes
         0xEA00E0B0 => ("TpAbl1Begin", "ABL 1 Begin"),
@@ -1460,9 +1499,10 @@ fn look_up_abl(code: u32) -> Option<(&'static str, &'static str)> {
             "Heap Locate for PMU SRAM Msg Block Error",
         ),
         0xEA00E2E4 => ("TpAblErrorAbl2AutoAloc", "ABL2 Auto Alloc Error"),
-        0xEA00E2E5 => {
-            ("TpAblErrorFlowP3FamilySupport", "Flow P3 Family Support Error")
-        }
+        0xEA00E2E5 => (
+            "TpAblErrorFlowP3FamilySupport/TpAblErrorAbl4GenError",
+            "Flow P3 Family Support / ABL 4 General Error",
+        ),
         0xEA00E2E7 => (
             "TpAblErrorMixRdimmLrdimmInChannel",
             "Mix RDIMM & LRDIMM in a channel",
