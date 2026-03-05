@@ -14,6 +14,12 @@ pub enum PostCode {
     Abl(AblCode),
     /// Code in the ABL range (0xEA00xxxx) but not in the lookup table.
     UnknownAbl(u32),
+    /// Oxide-specific code (0x1DExxxxx)
+    Oxide(OxideCode),
+    /// Host OS boot stage (0x1DE0Bxxx).
+    HostBootStage(HostBootStageCode),
+    /// Code in the Oxide range (0x1DExxxxx) but not in the lookup table.
+    UnknownOxide(u32),
     /// Completely unrecognised POST code.
     Unknown(u32),
 }
@@ -54,6 +60,24 @@ pub struct AblCode {
     pub name: &'static str,
     /// Human-readable description.
     pub description: &'static str,
+}
+
+/// An Oxide-specific code
+pub struct OxideCode {
+    /// The raw 32-bit POST code.
+    pub code: u32,
+    /// Symbolic name
+    pub name: &'static str,
+    /// Human-readable description.
+    pub description: &'static str,
+}
+
+/// A host OS boot stage code (0x1DE0_BXXX).
+pub struct HostBootStageCode {
+    /// The raw 32-bit POST code.
+    pub code: u32,
+    /// Boot stage number (the low 12 bits).
+    pub stage: u16,
 }
 
 impl PostCode {
@@ -98,6 +122,22 @@ impl PostCode {
                 format!("ABL Code: 0x{code:08x}"),
                 "  Unknown ABL test point (no matching entry)".to_string(),
             ],
+            PostCode::Oxide(info) => vec![
+                format!("Oxide Code: 0x{:08x}", info.code),
+                format!("  Name:   {}", info.name),
+                format!("  Detail: {}", info.description),
+            ],
+            PostCode::HostBootStage(info) => vec![
+                format!("Oxide Code: 0x{:08x}", info.code),
+                format!(
+                    "  Host OS boot stage {} (0x{:03x})",
+                    info.stage, info.stage
+                ),
+            ],
+            PostCode::UnknownOxide(code) => vec![
+                format!("Oxide Code: 0x{code:08x}"),
+                "  Unknown Oxide code (no matching entry)".to_string(),
+            ],
             PostCode::Unknown(code) => {
                 vec![format!("Unknown POST code: 0x{code:08x}")]
             }
@@ -135,6 +175,24 @@ pub fn decode(code: u32) -> PostCode {
     // Unknown but in the ABL range
     if code & 0xff000000 == 0xea000000 {
         return PostCode::UnknownAbl(code);
+    }
+
+    // Oxide codes
+    if let Some((name, description)) = look_up_oxide(code) {
+        return PostCode::Oxide(OxideCode { code, name, description });
+    }
+
+    // Host OS boot stage codes: 0x1DE0_BXXX where XXX is the stage
+    if code & 0xfffff000 == 0x1de0b000 {
+        return PostCode::HostBootStage(HostBootStageCode {
+            code,
+            stage: (code & 0xfff) as u16,
+        });
+    }
+
+    // Unknown but in the Oxide range
+    if code & 0xfff00000 == 0x1de00000 {
+        return PostCode::UnknownOxide(code);
     }
 
     PostCode::Unknown(code)
@@ -1714,4 +1772,141 @@ fn look_up_abl(code: u32) -> Option<(&'static str, &'static str)> {
 
         _ => return None,
     })
+}
+
+fn look_up_oxide(code: u32) -> Option<(&'static str, &'static str)> {
+    Some(match code {
+        // 0x1DE9_XXXX phbl
+        0x1DE9_0001 => ("PHBLhello", "phbl has started"),
+        0x1DE9_CA11 => ("PHBLcall", "phbl calling illumos kernel entry point"),
+        0x1DE9_DEAD => ("PHBLhalted", "phbl has halted due to a panic"),
+
+        _ => return None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pmu_code() {
+        let post = decode(0xea010a12);
+        match post {
+            PostCode::Pmu(pmu) => {
+                assert_eq!(pmu.umc_channel, 0);
+                assert_eq!(pmu.board_dimm, "C");
+                assert_eq!(pmu.training_phase, 0xa);
+                assert_eq!(pmu.progress_code, 0x12);
+            }
+            other => panic!("expected Pmu, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn bootloader_code() {
+        let post = decode(0xaa000000);
+        match post {
+            PostCode::Bootloader(info) => {
+                assert_eq!(info.source, "ASP FMC");
+                assert_eq!(info.status, 0);
+                assert_eq!(info.name, "BL_OK");
+            }
+            other => panic!("expected Bootloader, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn abl_known_code() {
+        let post = decode(0xea00e002);
+        match post {
+            PostCode::Abl(abl) => {
+                assert_eq!(abl.name, "TpProcMemBeforeSpdProcessing");
+            }
+            other => panic!("expected Abl, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn abl_unknown_code() {
+        let post = decode(0xea00ffff);
+        match post {
+            PostCode::UnknownAbl(code) => assert_eq!(code, 0xea00ffff),
+            other => panic!("expected UnknownAbl, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn oxide_known_code() {
+        let post = decode(0x1de90001);
+        match post {
+            PostCode::Oxide(info) => {
+                assert_eq!(info.name, "PHBLhello");
+            }
+            other => panic!("expected Oxide, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn host_boot_stage_zero() {
+        let post = decode(0x1de0b000);
+        match post {
+            PostCode::HostBootStage(info) => {
+                assert_eq!(info.stage, 0);
+                assert_eq!(info.code, 0x1de0b000);
+            }
+            other => panic!("expected HostBootStage, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn host_boot_stage_typical() {
+        let post = decode(0x1de0b007);
+        match post {
+            PostCode::HostBootStage(info) => {
+                assert_eq!(info.stage, 7);
+            }
+            other => panic!("expected HostBootStage, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn host_boot_stage_max() {
+        let post = decode(0x1de0bfff);
+        match post {
+            PostCode::HostBootStage(info) => {
+                assert_eq!(info.stage, 0xfff);
+            }
+            other => panic!("expected HostBootStage, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn host_boot_stage_lines() {
+        let post = decode(0x1de0b042);
+        let lines = post.lines();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("1de0b042"));
+        assert!(lines[1].contains("66"));
+        assert!(lines[1].contains("0x042"));
+    }
+
+    #[test]
+    fn unknown_oxide_not_boot_stage() {
+        // 0x1DE0_A000 is in the Oxide range but not a boot stage
+        let post = decode(0x1de0a000);
+        match post {
+            PostCode::UnknownOxide(code) => assert_eq!(code, 0x1de0a000),
+            other => panic!("expected UnknownOxide, got: {:?}", other.lines()),
+        }
+    }
+
+    #[test]
+    fn completely_unknown() {
+        let post = decode(0x12345678);
+        match post {
+            PostCode::Unknown(code) => assert_eq!(code, 0x12345678),
+            other => panic!("expected Unknown, got: {:?}", other.lines()),
+        }
+    }
 }
